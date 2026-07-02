@@ -25,7 +25,16 @@
   .body { padding:20px; }
   h1 { font-size:18px; margin:0 0 4px; }
   .muted { color:#777; font-size:13px; margin:0 0 14px; }
-  .art { width:100%; border-radius:10px; border:1px solid #e5e5e8; display:block; }
+  .art-wrap { text-align:center; }
+  .art { max-width:100%; width:auto; max-height:70vh; border-radius:10px; border:1px solid #e5e5e8;
+         display:inline-block; cursor:zoom-in; }
+  .zoom-hint { font-size:11px; color:#a2a2a8; margin:6px 0 0; text-align:center; }
+  .lightbox { position:fixed; inset:0; background:rgba(10,10,12,.95); z-index:50;
+              overflow:auto; -webkit-overflow-scrolling:touch; display:none; }
+  .lightbox.open { display:block; }
+  .lightbox img { display:block; margin:auto; padding:44px 0; max-width:none; cursor:zoom-out; }
+  .lightbox .close { position:fixed; top:14px; right:14px; width:38px; height:38px; border-radius:50%;
+                     background:rgba(255,255,255,.15); color:#fff; font-size:18px; border:none; z-index:51; }
   textarea { width:100%; box-sizing:border-box; margin-top:14px; padding:10px 12px; font:inherit;
              font-size:14px; border:1px solid #d4d4d8; border-radius:10px; resize:vertical; min-height:64px; }
   .btns { display:flex; gap:10px; margin-top:14px; }
@@ -106,13 +115,17 @@
     var h = document.createElement('h1'); h.textContent = copyFor(ap.kind).heading;
     var m = document.createElement('p'); m.className = 'muted';
     m.textContent = (ap.title ? ap.title + ' — ' : '') + 'take a look, then approve or tell us what to change.';
+    var wrap = document.createElement('div'); wrap.className = 'art-wrap';
     var img = document.createElement('img'); img.className = 'art'; img.alt = 'for review'; img.src = ap.image_url;
+    img.onclick = function () { openLightbox(ap.image_url); };
+    var hint = document.createElement('p'); hint.className = 'zoom-hint'; hint.textContent = '🔍 Tap the image to zoom';
+    wrap.append(img, hint);
     var ta = document.createElement('textarea'); ta.placeholder = 'Anything to change? (optional)';
     var btns = document.createElement('div'); btns.className = 'btns';
     var chg = document.createElement('button'); chg.className = 'chg'; chg.textContent = '✏️ Request changes';
     var ok = document.createElement('button'); ok.className = 'ok'; ok.textContent = '✅ Approve';
     btns.append(chg, ok);
-    body.append(h, m, img, ta, btns);
+    body.append(h, m, wrap, ta, btns);
     function submit(action) {
       ok.disabled = chg.disabled = true;
       fetch(API, {
@@ -181,6 +194,15 @@
       .then(renderSingle)
       .catch(notFound);
   }
+
+  var lb = document.createElement('div'); lb.className = 'lightbox';
+  var lbClose = document.createElement('button'); lbClose.className = 'close'; lbClose.textContent = '✕';
+  var lbImg = document.createElement('img');
+  lb.append(lbClose, lbImg); document.body.append(lb);
+  function openLightbox(src) { lbImg.src = src; lb.classList.add('open'); }
+  function closeLightbox() { lb.classList.remove('open'); lbImg.src = ''; }
+  lbClose.onclick = closeLightbox; lbImg.onclick = closeLightbox;
+  lb.onclick = function (e) { if (e.target === lb) closeLightbox(); };
 
   if (pid) loadPacket();
   else if (tid) loadSingle();
