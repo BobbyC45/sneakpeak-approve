@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SneakPeak — Artwork Approval</title>
+<style>
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f2f2f4; color:#111; }
+  .head { background:#111; color:#fff; text-align:center; padding:18px 16px 14px; }
+  .head .brand { font-weight:900; letter-spacing:2px; font-size:20px; }
+  .head .sub { font-size:11px; letter-spacing:3px; color:#bbb; margin-top:2px; }
+  .card { max-width:520px; margin:18px auto; background:#fff; border-radius:14px; overflow:hidden;
+          box-shadow:0 6px 24px rgba(0,0,0,.08); }
+  .body { padding:20px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .muted { color:#777; font-size:13px; margin:0 0 14px; }
+  .art { width:100%; border-radius:10px; border:1px solid #e5e5e8; display:block; }
+  textarea { width:100%; box-sizing:border-box; margin-top:14px; padding:10px 12px; font:inherit;
+             font-size:14px; border:1px solid #d4d4d8; border-radius:10px; resize:vertical; min-height:64px; }
+  .btns { display:flex; gap:10px; margin-top:14px; }
+  button { flex:1; font:inherit; font-size:15px; font-weight:800; padding:14px 10px; border:none;
+           border-radius:12px; cursor:pointer; }
+  button:disabled { opacity:.5; }
+  .ok { background:#1a9c4b; color:#fff; }
+  .chg { background:#fff; color:#b26a00; border:2px solid #e8a33d; }
+  .done { text-align:center; padding:34px 20px; }
+  .done .big { font-size:44px; }
+  .done h2 { margin:10px 0 6px; }
+  .done p { color:#666; margin:0; font-size:14px; }
+</style>
+</head>
+<body>
+  <div class="head"><div class="brand">SNEAKPEAK</div><div class="sub">SCREENPRINT — EMBROIDERY</div></div>
+  <div class="card" id="card">
+    <div class="done"><div class="big">⏳</div><h2>Loading…</h2><p>Fetching your artwork.</p></div>
+  </div>
+
+<script>
+  var API = 'https://zgkaeiqcgcrtsynslfsx.supabase.co/functions/v1/approve';
+  var t = new URLSearchParams(location.search).get('t') || '';
+  var card = document.getElementById('card');
+
+  function done(emoji, title, note) {
+    card.innerHTML = '';
+    var d = document.createElement('div'); d.className = 'done';
+    var b = document.createElement('div'); b.className = 'big'; b.textContent = emoji;
+    var h = document.createElement('h2'); h.textContent = title;
+    var p = document.createElement('p'); p.textContent = note;
+    d.append(b, h, p); card.append(d);
+  }
+  function doneFor(status) {
+    if (status === 'approved') done('✅', 'Artwork approved!', "Thanks — we're clear to print. We'll take it from here.");
+    else done('✏️', 'Changes requested', "Got it — we'll revise the artwork and send you an updated version.");
+  }
+
+  function render(ap) {
+    if (ap.status !== 'pending') { doneFor(ap.status); return; }
+    card.innerHTML = '';
+    var body = document.createElement('div'); body.className = 'body';
+    var h = document.createElement('h1'); h.textContent = 'Your artwork is ready to review';
+    var m = document.createElement('p'); m.className = 'muted';
+    m.textContent = (ap.title ? ap.title + ' — ' : '') + 'take a look, then approve or tell us what to change.';
+    var img = document.createElement('img'); img.className = 'art'; img.alt = 'artwork mockup'; img.src = ap.image_url;
+    var ta = document.createElement('textarea'); ta.placeholder = 'Anything to change? (optional)';
+    var btns = document.createElement('div'); btns.className = 'btns';
+    var chg = document.createElement('button'); chg.className = 'chg'; chg.textContent = '✏️ Request changes';
+    var ok = document.createElement('button'); ok.className = 'ok'; ok.textContent = '✅ Approve';
+    btns.append(chg, ok);
+    body.append(h, m, img, ta, btns); card.append(body);
+
+    function submit(action) {
+      ok.disabled = chg.disabled = true;
+      fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ t: t, action: action, comment: ta.value })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (ap2) { doneFor(ap2.status); })
+        .catch(function () { ok.disabled = chg.disabled = false; alert('Something went wrong — please try again.'); });
+    }
+    ok.onclick = function () { submit('approve'); };
+    chg.onclick = function () { submit('changes'); };
+  }
+
+  if (!t) {
+    done('🤔', 'Link not found', 'This approval link is invalid or has expired.');
+  } else {
+    fetch(API + '?t=' + encodeURIComponent(t))
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(render)
+      .catch(function () { done('🤔', 'Link not found', 'This approval link is invalid or has expired.'); });
+  }
+</script>
+</body>
+</html>
