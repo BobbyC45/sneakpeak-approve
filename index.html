@@ -265,14 +265,20 @@
       var a = e.touches[0], b = e.touches[1];
       var d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
       var s2 = Math.min(S.max, Math.max(S.min, T.s0 * (d / T.dist)));
-      S.tx = T.mx - (T.mx - T.tx0) * (s2 / T.s0);
-      S.ty = T.my - (T.my - T.ty0) * (s2 / T.s0);
+      var cmx = (a.clientX + b.clientX) / 2, cmy = (a.clientY + b.clientY) / 2;
+      S.tx = cmx - (T.mx - T.tx0) * (s2 / T.s0);
+      S.ty = cmy - (T.my - T.ty0) * (s2 / T.s0);
       S.s = s2; clampPos(); apply();
     } else if (e.touches.length === 1) {
       S.tx = e.touches[0].clientX - T.x0; S.ty = e.touches[0].clientY - T.y0;
       clampPos(); apply();
     }
   }, { passive: false });
+  lb.addEventListener('touchend', function (e) {
+    if (e.touches.length === 1) {
+      T.x0 = e.touches[0].clientX - S.tx; T.y0 = e.touches[0].clientY - S.ty;
+    }
+  }, { passive: true });
   lb.addEventListener('wheel', function (e) {
     e.preventDefault();
     zoomTo(S.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY);
