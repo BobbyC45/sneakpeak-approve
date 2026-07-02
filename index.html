@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SneakPeak — Artwork Approval</title>
+<title>SneakPeak — Order Review</title>
 <style>
   body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f2f2f4; color:#111; }
   .head { background:#111; color:#fff; text-align:center; padding:18px 16px 14px; }
@@ -11,6 +11,17 @@
   .head .sub { font-size:11px; letter-spacing:3px; color:#bbb; margin-top:2px; }
   .card { max-width:520px; margin:18px auto; background:#fff; border-radius:14px; overflow:hidden;
           box-shadow:0 6px 24px rgba(0,0,0,.08); }
+  .steps { display:flex; justify-content:center; gap:6px; padding:16px 16px 0; flex-wrap:wrap; }
+  .step { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#999;
+          padding:5px 10px; border-radius:999px; background:#f1f1f3; }
+  .step .dot { width:18px; height:18px; border-radius:50%; background:#d6d6da; color:#fff;
+               display:flex; align-items:center; justify-content:center; font-size:11px; }
+  .step.done { color:#1a9c4b; background:#e7f6ec; }
+  .step.done .dot { background:#1a9c4b; }
+  .step.active { color:#111; background:#eef3fe; }
+  .step.active .dot { background:#2f6eed; }
+  .step.paused { color:#b26a00; background:#fdf3e3; }
+  .step.paused .dot { background:#e8a33d; }
   .body { padding:20px; }
   h1 { font-size:18px; margin:0 0 4px; }
   .muted { color:#777; font-size:13px; margin:0 0 14px; }
@@ -23,94 +34,157 @@
   button:disabled { opacity:.5; }
   .ok { background:#1a9c4b; color:#fff; }
   .chg { background:#fff; color:#b26a00; border:2px solid #e8a33d; }
-  .done { text-align:center; padding:34px 20px; }
-  .done .big { font-size:44px; }
-  .done h2 { margin:10px 0 6px; }
-  .done p { color:#666; margin:0; font-size:14px; }
+  .done-card { text-align:center; padding:34px 20px; }
+  .done-card .big { font-size:44px; }
+  .done-card h2 { margin:10px 0 6px; }
+  .done-card p { color:#666; margin:0; font-size:14px; }
+  .summary { list-style:none; margin:16px auto 0; padding:0; max-width:280px; text-align:left; }
+  .summary li { font-size:14px; font-weight:700; color:#1a9c4b; padding:6px 0; border-bottom:1px solid #f0f0f2; }
+  .summary li:last-child { border-bottom:none; }
 </style>
 </head>
 <body>
   <div class="head"><div class="brand">SNEAKPEAK</div><div class="sub">SCREENPRINT — EMBROIDERY</div></div>
   <div class="card" id="card">
-    <div class="done"><div class="big">⏳</div><h2>Loading…</h2><p>Fetching your artwork.</p></div>
+    <div class="done-card"><div class="big">⏳</div><h2>Loading…</h2><p>Fetching your review.</p></div>
   </div>
 
 <script>
   var API = 'https://zgkaeiqcgcrtsynslfsx.supabase.co/functions/v1/approve';
-  var t = new URLSearchParams(location.search).get('t') || '';
+  var params = new URLSearchParams(location.search);
+  var pid = params.get('p') || '';
+  var tid = params.get('t') || '';
   var card = document.getElementById('card');
 
-  function done(emoji, title, note) {
-    card.innerHTML = '';
-    var d = document.createElement('div'); d.className = 'done';
-    var b = document.createElement('div'); b.className = 'big'; b.textContent = emoji;
-    var h = document.createElement('h2'); h.textContent = title;
-    var p = document.createElement('p'); p.textContent = note;
-    d.append(b, h, p); card.append(d);
-  }
+  var KIND_LABEL = { artwork: 'Artwork', order_form: 'Order details', invoice: 'Invoice' };
   var COPY = {
     artwork: {
       heading: 'Your artwork is ready to review',
-      approved: ['Artwork approved!', "Thanks — we're clear to print. We'll take it from here."],
-      changes: ['Changes requested', "Got it — we'll revise the artwork and send you an updated version."]
+      approved: ['Artwork approved!', "Thanks — we're clear to print."],
+      changes: ['Changes requested', "Got it — we'll revise the artwork and text you when the new version is ready."]
     },
     order_form: {
       heading: 'Please review your order details',
       approved: ['Order approved!', "Thanks — we've got it from here."],
-      changes: ['Changes requested', "Got it — we'll adjust the order and send you an updated version."]
+      changes: ['Changes requested', "Got it — we'll adjust the order and text you when it's updated."]
     },
     invoice: {
       heading: 'Please review your invoice',
       approved: ['Invoice approved!', "Thanks — we'll move your order forward."],
-      changes: ['Changes requested', "Got it — we'll make adjustments and send you an updated version."]
+      changes: ['Changes requested', "Got it — we'll make adjustments and text you when it's updated."]
     }
   };
-  var kind = 'artwork';
-  function doneFor(status) {
-    var c = COPY[kind] || COPY.artwork;
-    if (status === 'approved') done('✅', c.approved[0], c.approved[1]);
-    else done('✏️', c.changes[0], c.changes[1]);
+  function copyFor(kind) { return COPY[kind] || COPY.artwork; }
+
+  function doneCard(emoji, title, note) {
+    var d = document.createElement('div'); d.className = 'done-card';
+    var b = document.createElement('div'); b.className = 'big'; b.textContent = emoji;
+    var h = document.createElement('h2'); h.textContent = title;
+    var pEl = document.createElement('p'); pEl.textContent = note;
+    d.append(b, h, pEl);
+    return d;
   }
 
-  function render(ap) {
-    kind = ap.kind || 'artwork';
-    if (ap.status !== 'pending') { doneFor(ap.status); return; }
-    card.innerHTML = '';
+  // The progress chips across the top of a packet.
+  function progressBar(steps, activeId) {
+    var wrap = document.createElement('div'); wrap.className = 'steps';
+    steps.forEach(function (s, i) {
+      var el = document.createElement('div');
+      var state = s.status === 'approved' ? 'done' : s.status === 'changes' ? 'paused' : (s.id === activeId ? 'active' : '');
+      el.className = 'step ' + state;
+      var dot = document.createElement('span'); dot.className = 'dot';
+      dot.textContent = s.status === 'approved' ? '✓' : s.status === 'changes' ? '!' : String(i + 1);
+      var lbl = document.createElement('span'); lbl.textContent = KIND_LABEL[s.kind] || 'Review';
+      el.append(dot, lbl); wrap.append(el);
+    });
+    return wrap;
+  }
+
+  // One reviewable step: image + comment + Approve / Request changes.
+  function stepCard(ap, onDecided) {
     var body = document.createElement('div'); body.className = 'body';
-    var h = document.createElement('h1'); h.textContent = (COPY[kind] || COPY.artwork).heading;
+    var h = document.createElement('h1'); h.textContent = copyFor(ap.kind).heading;
     var m = document.createElement('p'); m.className = 'muted';
     m.textContent = (ap.title ? ap.title + ' — ' : '') + 'take a look, then approve or tell us what to change.';
-    var img = document.createElement('img'); img.className = 'art'; img.alt = 'artwork mockup'; img.src = ap.image_url;
+    var img = document.createElement('img'); img.className = 'art'; img.alt = 'for review'; img.src = ap.image_url;
     var ta = document.createElement('textarea'); ta.placeholder = 'Anything to change? (optional)';
     var btns = document.createElement('div'); btns.className = 'btns';
     var chg = document.createElement('button'); chg.className = 'chg'; chg.textContent = '✏️ Request changes';
     var ok = document.createElement('button'); ok.className = 'ok'; ok.textContent = '✅ Approve';
     btns.append(chg, ok);
-    body.append(h, m, img, ta, btns); card.append(body);
-
+    body.append(h, m, img, ta, btns);
     function submit(action) {
       ok.disabled = chg.disabled = true;
       fetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ t: t, action: action, comment: ta.value })
+        body: JSON.stringify({ t: ap.id, action: action, comment: ta.value })
       })
         .then(function (r) { return r.json(); })
-        .then(function (ap2) { doneFor(ap2.status); })
+        .then(function () { onDecided(); })
         .catch(function () { ok.disabled = chg.disabled = false; alert('Something went wrong — please try again.'); });
     }
     ok.onclick = function () { submit('approve'); };
     chg.onclick = function () { submit('changes'); };
+    return body;
   }
 
-  if (!t) {
-    done('🤔', 'Link not found', 'This approval link is invalid or has expired.');
-  } else {
-    fetch(API + '?t=' + encodeURIComponent(t))
-      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
-      .then(render)
-      .catch(function () { done('🤔', 'Link not found', 'This approval link is invalid or has expired.'); });
+  function notFound() {
+    card.innerHTML = '';
+    card.append(doneCard('🤔', 'Link not found', 'This review link is invalid or has expired.'));
   }
+
+  // ---- Packet mode: walk the steps in order --------------------------------
+  function renderPacket(steps) {
+    card.innerHTML = '';
+    var active = null;
+    for (var i = 0; i < steps.length; i++) {
+      if (steps[i].status !== 'approved') { active = steps[i]; break; }
+    }
+    card.append(progressBar(steps, active && active.id));
+
+    if (!active) {
+      var all = doneCard('🎉', "You're all set!", 'Everything is approved — your order is moving.');
+      var ul = document.createElement('ul'); ul.className = 'summary';
+      steps.forEach(function (s) {
+        var li = document.createElement('li'); li.textContent = '✓ ' + (KIND_LABEL[s.kind] || 'Review');
+        ul.append(li);
+      });
+      all.append(ul);
+      card.append(all);
+      return;
+    }
+    if (active.status === 'changes') {
+      var c = copyFor(active.kind).changes;
+      card.append(doneCard('✏️', c[0], c[1]));
+      return;
+    }
+    card.append(stepCard(active, loadPacket));
+  }
+  function loadPacket() {
+    fetch(API + '?p=' + encodeURIComponent(pid))
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (res) { renderPacket(res.packet || []); })
+      .catch(notFound);
+  }
+
+  // ---- Single mode (?t=) — original one-card links keep working ------------
+  function renderSingle(ap) {
+    card.innerHTML = '';
+    if (ap.status === 'approved') { var a = copyFor(ap.kind).approved; card.append(doneCard('✅', a[0], a[1])); return; }
+    if (ap.status === 'changes') { var c = copyFor(ap.kind).changes; card.append(doneCard('✏️', c[0], c[1])); return; }
+    card.append(stepCard(ap, loadSingle));
+  }
+  function loadSingle() {
+    fetch(API + '?t=' + encodeURIComponent(tid))
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(renderSingle)
+      .catch(notFound);
+  }
+
+  if (pid) loadPacket();
+  else if (tid) loadSingle();
+  else notFound();
 </script>
 </body>
 </html>
