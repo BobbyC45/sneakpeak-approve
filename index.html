@@ -48,16 +48,36 @@
     var p = document.createElement('p'); p.textContent = note;
     d.append(b, h, p); card.append(d);
   }
+  var COPY = {
+    artwork: {
+      heading: 'Your artwork is ready to review',
+      approved: ['Artwork approved!', "Thanks — we're clear to print. We'll take it from here."],
+      changes: ['Changes requested', "Got it — we'll revise the artwork and send you an updated version."]
+    },
+    order_form: {
+      heading: 'Please review your order details',
+      approved: ['Order approved!', "Thanks — we've got it from here."],
+      changes: ['Changes requested', "Got it — we'll adjust the order and send you an updated version."]
+    },
+    invoice: {
+      heading: 'Please review your invoice',
+      approved: ['Invoice approved!', "Thanks — we'll move your order forward."],
+      changes: ['Changes requested', "Got it — we'll make adjustments and send you an updated version."]
+    }
+  };
+  var kind = 'artwork';
   function doneFor(status) {
-    if (status === 'approved') done('✅', 'Artwork approved!', "Thanks — we're clear to print. We'll take it from here.");
-    else done('✏️', 'Changes requested', "Got it — we'll revise the artwork and send you an updated version.");
+    var c = COPY[kind] || COPY.artwork;
+    if (status === 'approved') done('✅', c.approved[0], c.approved[1]);
+    else done('✏️', c.changes[0], c.changes[1]);
   }
 
   function render(ap) {
+    kind = ap.kind || 'artwork';
     if (ap.status !== 'pending') { doneFor(ap.status); return; }
     card.innerHTML = '';
     var body = document.createElement('div'); body.className = 'body';
-    var h = document.createElement('h1'); h.textContent = 'Your artwork is ready to review';
+    var h = document.createElement('h1'); h.textContent = (COPY[kind] || COPY.artwork).heading;
     var m = document.createElement('p'); m.className = 'muted';
     m.textContent = (ap.title ? ap.title + ' — ' : '') + 'take a look, then approve or tell us what to change.';
     var img = document.createElement('img'); img.className = 'art'; img.alt = 'artwork mockup'; img.src = ap.image_url;
