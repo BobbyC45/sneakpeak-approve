@@ -27,7 +27,8 @@
   .muted { color:#777; font-size:13px; margin:0 0 14px; }
   .art-wrap { text-align:center; }
   .art { max-width:100%; width:auto; max-height:70vh; border-radius:10px; border:1px solid #e5e5e8;
-         display:inline-block; cursor:zoom-in; }
+         display:inline-block; cursor:zoom-in; margin-bottom:10px; }
+  .art:last-of-type { margin-bottom:0; }
   .zoom-hint { font-size:11px; color:#a2a2a8; margin:6px 0 0; text-align:center; }
   .lightbox { position:fixed; inset:0; background:rgba(8,8,10,.96); z-index:50; display:none;
               overflow:hidden; touch-action:none; }
@@ -122,10 +123,17 @@
     var m = document.createElement('p'); m.className = 'muted';
     m.textContent = (ap.title ? ap.title + ' — ' : '') + 'take a look, then approve or tell us what to change.';
     var wrap = document.createElement('div'); wrap.className = 'art-wrap';
-    var img = document.createElement('img'); img.className = 'art'; img.alt = 'for review'; img.src = ap.image_url;
-    img.onclick = function () { openLightbox(ap.image_url); };
-    var hint = document.createElement('p'); hint.className = 'zoom-hint'; hint.textContent = '🔍 Tap to zoom — pinch to look closer';
-    wrap.append(img, hint);
+    var urls = [ap.image_url].concat(ap.extra_urls || []);
+    urls.forEach(function (u) {
+      var img = document.createElement('img'); img.className = 'art'; img.alt = 'for review'; img.src = u;
+      img.onclick = function () { openLightbox(u); };
+      wrap.append(img);
+    });
+    var hint = document.createElement('p'); hint.className = 'zoom-hint';
+    hint.textContent = urls.length > 1
+      ? '🔍 ' + urls.length + ' designs — tap any to zoom, one approve covers all'
+      : '🔍 Tap to zoom — pinch to look closer';
+    wrap.append(hint);
     var ta = document.createElement('textarea'); ta.placeholder = 'Anything to change? (optional)';
     var btns = document.createElement('div'); btns.className = 'btns';
     var chg = document.createElement('button'); chg.className = 'chg'; chg.textContent = '✏️ Request changes';
