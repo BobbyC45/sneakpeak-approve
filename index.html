@@ -57,6 +57,8 @@
   .summary { list-style:none; margin:16px auto 0; padding:0; max-width:280px; text-align:left; }
   .summary li { font-size:14px; font-weight:700; color:#1a9c4b; padding:6px 0; border-bottom:1px solid #f0f0f2; }
   .summary li:last-child { border-bottom:none; }
+  .receipt-sec { padding:0 20px; }
+  .receipt-lbl { font-size:13px; font-weight:800; color:#1a9c4b; margin:14px 0 8px; }
 </style>
 </head>
 <body>
@@ -171,14 +173,30 @@
     card.append(progressBar(steps, active && active.id));
 
     if (!active) {
-      var all = doneCard('🎉', "You're all set!", 'Everything is approved — your order is moving.');
-      var ul = document.createElement('ul'); ul.className = 'summary';
+      // Everything's approved → a permanent, browsable RECEIPT: the header,
+      // then every step's image(s) — mockups, order details, invoice — so the
+      // client can reopen this link anytime and see exactly what they ordered.
+      card.append(doneCard('🎉', "You're all set!", "Everything's approved — here's your order, saved for your records."));
       steps.forEach(function (s) {
-        var li = document.createElement('li'); li.textContent = '✓ ' + (KIND_LABEL[s.kind] || 'Review');
-        ul.append(li);
+        var urls = [s.image_url].concat(s.extra_urls || []).filter(Boolean);
+        if (!urls.length) return;
+        var sec = document.createElement('div'); sec.className = 'receipt-sec';
+        var lbl = document.createElement('div'); lbl.className = 'receipt-lbl';
+        lbl.textContent = '✓ ' + (KIND_LABEL[s.kind] || 'Review');
+        sec.append(lbl);
+        var wrap = document.createElement('div'); wrap.className = 'art-wrap';
+        urls.forEach(function (u) {
+          var img = document.createElement('img'); img.className = 'art'; img.alt = 'your order'; img.src = u;
+          img.onclick = function () { openLightbox(u); };
+          wrap.append(img);
+        });
+        sec.append(wrap);
+        card.append(sec);
       });
-      all.append(ul);
-      card.append(all);
+      var foot = document.createElement('p'); foot.className = 'zoom-hint';
+      foot.style.padding = '4px 20px 18px';
+      foot.textContent = '🔍 Tap any image to zoom · bookmark this page to see your order anytime';
+      card.append(foot);
       return;
     }
     if (active.status === 'changes') {
